@@ -14,38 +14,66 @@
  * Иногда промисы от API будут приходить в состояние rejected, (прямо как и API в реальной жизни)
  * Ответ будет приходить в поле {result}
  */
- import Api from '../tools/api';
+ import { allPass, equals, filter, includes, length, not, nth, pipe, split, tap } from 'ramda';
+import Api from '../tools/api';
+import { round } from 'lodash';
 
  const api = new Api();
 
- /**
-  * Я – пример, удали меня
-  */
- const wait = time => new Promise(resolve => {
-     setTimeout(resolve, time);
- })
-
  const processSequence = ({value, writeLog, handleSuccess, handleError}) => {
-     /**
-      * Я – пример, удали меня
-      */
-     writeLog(value);
 
-     api.get('https://api.tech/numbers/base', {from: 2, to: 10, number: '01011010101'}).then(({result}) => {
-         writeLog(result);
-     });
+    const isNull = equals(0);
+    const getFirstElement = nth(0);
+    const getIntegerPartOfNumber = (v) => pipe(
+        split,
+        getFirstElement
+    )('.', v);
+    const lengthIntegerPartOfNumber = pipe(
+        getIntegerPartOfNumber,
+        length
+    )
+    const isLengthLessThen10 = (v) => lengthIntegerPartOfNumber(v) < 10;
+    const isLengtGreaterThen2 = (v) => lengthIntegerPartOfNumber(v) > 2;
+    const isPositive = (v) => +v > 0;
+    const isDecimalString = (n) => pipe(
+        includes,
+        not
+    )(n, '0123456789.');
+    const isDecimalFloatOrInteger = (v) => pipe(
+        filter,
+        length,
+        isNull
+    )(isDecimalString, split('', v))
 
-     wait(2500).then(() => {
-         writeLog('SecondLog')
+    const log = tap(writeLog)
+    const sqr = (n) => n ** 2;
+    const mod3 = (n) => n % 3;
 
-         return wait(1500);
-     }).then(() => {
-         writeLog('ThirdLog');
+    const processResult = pipe(
+        log,
+        length,
+        log,
+        sqr,
+        log,
+        mod3,
+        log
+    );
+    
 
-         return wait(400);
-     }).then(() => {
-         handleSuccess('Done');
-     });
+    if (!allPass([getIntegerPartOfNumber, isLengthLessThen10, isLengtGreaterThen2, isPositive, isDecimalFloatOrInteger])(value)) {
+        handleError('ValidationError');
+    } else {
+        const roundedNumber = round(+value);
+        writeLog(roundedNumber);
+
+
+        api.get('https://api.tech/numbers/base', {from: 10, to: 2, number: String(roundedNumber)}).then(({result}) => {
+            const mod3Result = processResult(result);
+            return api.get(`https://animals.tech/${mod3Result}`, {})
+        }).then(({result}) => {
+            handleSuccess(result);
+        }).catch((err) => handleError(err))
+    }
  }
 
 export default processSequence;
